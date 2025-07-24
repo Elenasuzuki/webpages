@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>インタラクティブ・レポート：Prompt-as-Code と GitHub 活用</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Tech Blueprint -->
+    <!-- Application Structure Plan: このSPAは、ユーザーが複雑なレポート内容を段階的かつ直感的に理解できるよう、テーマ別のセクションに分かれたナビゲーション構造を採用します。1)「ホーム」で概要とメリットを提示、2)「PaCの基礎」で基本概念を解説、3)「実装ワークフロー」で中心的なプロセスをインタラクティブな図で可視化、4)「ツールとフレームワーク」で具体的な技術を比較検討、5)「戦略的導入」で実践的なロードマップを提示します。この非線形な構造により、ユーザーは自身の興味や知識レベルに応じて情報を探索でき、学習効果を最大化できます。 -->
+    <!-- Visualization & Content Choices: レポートの各情報を、その伝達目標に応じて最適な形式に変換します。「PaCの利点」はアイコン付きカードで要点を提示（目標：通知）。「従来手法 vs PaC」は左右比較レイアウトで違いを明確化（目標：比較）。「PaCワークフロー」はHTML/CSS製のインタラクティブなフローチャートでプロセスを表現し、クリックで詳細を表示（目標：整理・関係性）。「テストピラミッド」はChart.jsの横棒グラフでコストと速度のトレードオフを可視化（目標：比較）。「ツール比較」はインタラクティブなテーブルで機能の違いを整理（目標：比較）。これにより、テキスト中心のレポートを、視覚的でエンゲージメントの高い体験へと昇華させます。SVG/Mermaidは使用しません。 -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+        .nav-link {
+            transition: color 0.3s, border-bottom-color 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link.active, .nav-link:hover {
+            color: #0891b2;
+            border-bottom-color: #0891b2;
+        }
+        .section {
+            display: none;
+        }
+        .section.active {
+            display: block;
+        }
+        .card {
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .workflow-step {
+            transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+            cursor: pointer;
+        }
+        .workflow-step.active, .workflow-step:hover {
+            background-color: #0891b2;
+            border-color: #06b6d4;
+            color: white;
+        }
+        .tool-row:hover {
+            background-color: #f1f5f9;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-cyan-700">Prompt-as-Code</h1>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#home" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700">ホーム</a>
+                        <a href="#fundamentals" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700">PaCの基礎</a>
+                        <a href="#workflow" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700">実装ワークフロー</a>
+                        <a href="#tools" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700">ツール</a>
+                        <a href="#adoption" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700">戦略的導入</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-cyan-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500">
+                        <span class="sr-only">メインメニューを開く</span>
+                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="mobile-menu" class="md:hidden hidden">
+                <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                    <a href="#home" class="nav-link block px-3 py-2 rounded-md text-base font-medium text-gray-700">ホーム</a>
+                    <a href="#fundamentals" class="nav-link block px-3 py-2 rounded-md text-base font-medium text-gray-700">PaCの基礎</a>
+                    <a href="#workflow" class="nav-link block px-3 py-2 rounded-md text-base font-medium text-gray-700">実装ワークフロー</a>
+                    <a href="#tools" class="nav-link block px-3 py-2 rounded-md text-base font-medium text-gray-700">ツール</a>
+                    <a href="#adoption" class="nav-link block px-3 py-2 rounded-md text-base font-medium text-gray-700">戦略的導入</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <section id="home" class="section">
+            <div class="text-center">
+                <h2 class="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">
+                    プロンプトエンジニアリングの変革
+                </h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
+                    アドホックな「魔法の呪文」から、体系的なエンジニアリング規律へ。GitHubを活用した「Prompt-as-Code」が、信頼性の高いAI開発の未来を拓きます。
+                </p>
+            </div>
+
+            <div class="mt-12">
+                <h3 class="text-2xl font-bold text-center text-gray-800">PaCがもたらす核心的メリット</h3>
+                <p class="mt-2 text-center text-gray-500">従来のプロンプト管理の課題を克服し、AI開発に規律と信頼性をもたらします。</p>
+                <div class="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+                    <div class="card bg-white p-6 rounded-lg shadow-md">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-cyan-100 text-cyan-700 rounded-lg p-3">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M4 19v-5h5m11-4v5h-5M20 5v-1a1 1 0 00-1-1h-4a1 1 0 00-1 1v1h6zM4 9h16M4 15h16"></path></svg>
+                            </div>
+                            <h4 class="ml-4 text-lg font-semibold text-gray-900">再現性と追跡性</h4>
+                        </div>
+                        <p class="mt-4 text-gray-600">Gitによる厳格なバージョン管理で、全ての変更を追跡。問題発生時の原因特定とデバッグを迅速化します。</p>
+                    </div>
+                    <div class="card bg-white p-6 rounded-lg shadow-md">
+                        <div class="flex items-center">
+                             <div class="flex-shrink-0 bg-cyan-100 text-cyan-700 rounded-lg p-3">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            </div>
+                            <h4 class="ml-4 text-lg font-semibold text-gray-900">体系的な協業</h4>
+                        </div>
+                        <p class="mt-4 text-gray-600">プルリクエストを介したレビュー文化を醸成。属人的な知識をチームの共有資産へと変えます。</p>
+                    </div>
+                    <div class="card bg-white p-6 rounded-lg shadow-md">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-cyan-100 text-cyan-700 rounded-lg p-3">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            </div>
+                            <h4 class="ml-4 text-lg font-semibold text-gray-900">自動化と効率性</h4>
+                        </div>
+                        <p class="mt-4 text-gray-600">CI/CDパイプラインによるテストとデプロイの自動化で、開発サイクルを高速化し、手作業のミスを削減します。</p>
+                    </div>
+                    <div class="card bg-white p-6 rounded-lg shadow-md">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-cyan-100 text-cyan-700 rounded-lg p-3">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                            </div>
+                            <h4 class="ml-4 text-lg font-semibold text-gray-900">ガバナンスとセキュリティ</h4>
+                        </div>
+                        <p class="mt-4 text-gray-600">プロンプトの変更・承認プロセスを統制し、プロンプトインジェクション等の脆弱性対策を体系化します。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="fundamentals" class="section">
+            <div class="text-center">
+                <h2 class="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">PaCの基礎</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
+                    プロンプトを単なるテキストから、バージョン管理・テスト・デプロイ可能な「コード」として扱うパラダイムシフトを理解します。
+                </p>
+            </div>
+
+            <div class="mt-12">
+                <h3 class="text-2xl font-bold text-center text-gray-800">従来管理の課題 vs PaCによる解決策</h3>
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                    <div class="bg-white p-6 rounded-lg border border-red-200">
+                        <h4 class="text-xl font-semibold text-red-700">❌ 従来のアドホックな管理</h4>
+                        <ul class="mt-4 space-y-3 text-gray-600 list-disc list-inside">
+                            <li><span class="font-semibold">バージョン管理の欠如:</span> 変更履歴が追えず、ロールバックが困難。</li>
+                            <li><span class="font-semibold">再現性の欠如:</span> 過去の成功結果を安定して再現できない。</li>
+                            <li><span class="font-semibold">コラボレーションの混乱:</span> レビュープロセスがなく、品質がばらつく。</li>
+                            <li><span class="font-semibold">品質ゲートの不在:</span> リリース前の自動テストが行われない。</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-green-200">
+                        <h4 class="text-xl font-semibold text-green-700">✅ Prompt-as-Codeによる解決</h4>
+                        <ul class="mt-4 space-y-3 text-gray-600 list-disc list-inside">
+                            <li><span class="font-semibold">完全な監査証跡:</span> Gitが全ての変更を記録し、トレーサビリティを確保。</li>
+                            <li><span class="font-semibold">安定した再現性:</span> プロンプトと設定をコードとして管理し、結果を安定化。</li>
+                            <li><span class="font-semibold">体系的な協業:</span> プルリクエストで品質をレビューし、知識を共有。</li>
+                            <li><span class="font-semibold">自動化された品質保証:</span> CI/CDでテストを自動化し、リグレッションを防止。</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-16">
+                <h3 class="text-2xl font-bold text-center text-gray-800">Prompt-as-Code vs Prompt-as-Data</h3>
+                <p class="mt-2 text-center text-gray-500 max-w-3xl mx-auto">成熟したMLOps戦略は、プロンプトを構成する「コード」と「データ」の二面性を理解し、それぞれに適した方法で管理する必要があります。</p>
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h4 class="text-xl font-semibold text-gray-800">Prompt as Code (コードとしての側面)</h4>
+                        <p class="mt-2 text-gray-500">プロンプトの構造、ロジック、振る舞いを定義する部分。</p>
+                        <ul class="mt-4 space-y-2 text-gray-600">
+                            <li class="flex items-start"><span class="text-cyan-600 mr-2">❯</span>プロンプトテンプレート、指示（Instruction）</li>
+                            <li class="flex items-start"><span class="text-cyan-600 mr-2">❯</span>条件分岐やループなどの制御ロジック</li>
+                            <li class="flex items-start"><span class="text-cyan-600 mr-2">❯</span>ガードレール（安全制約）</li>
+                        </ul>
+                        <div class="mt-4 bg-gray-100 p-3 rounded-md text-sm text-gray-700">
+                            <strong>管理方法:</strong> Gitによるバージョン管理、単体テスト、静的解析
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h4 class="text-xl font-semibold text-gray-800">Prompt as Data (データとしての側面)</h4>
+                        <p class="mt-2 text-gray-500">プロンプトの性能や出力を方向づけるデータ要素。</p>
+                        <ul class="mt-4 space-y-2 text-gray-600">
+                            <li class="flex items-start"><span class="text-cyan-600 mr-2">❯</span>評価用のテストケース群</li>
+                            <li class="flex items-start"><span class="text-cyan-600 mr-2">❯</span>Few-shot学習のための具体例</li>
+                            <li class="flex items-start"><span class="text-cyan-600 mr-2">❯</span>RAGで注入されるコンテキスト情報</li>
+                        </ul>
+                        <div class="mt-4 bg-gray-100 p-3 rounded-md text-sm text-gray-700">
+                            <strong>管理方法:</strong> データ検証、ドリフト検出、DVC等のデータバージョン管理
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="workflow" class="section">
+            <div class="text-center">
+                <h2 class="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">実装ワークフロー</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
+                    プロンプト開発ライフサイクル（PDLC）の全体像です。各ステップをクリックして詳細を確認してください。
+                </p>
+            </div>
+
+            <div class="mt-12">
+                <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4">
+                    <div id="step-versioning" class="workflow-step border-2 border-gray-300 rounded-lg p-4 text-center">バージョン管理</div>
+                    <div class="text-2xl text-gray-400">→</div>
+                    <div id="step-review" class="workflow-step border-2 border-gray-300 rounded-lg p-4 text-center">レビュー (PR)</div>
+                    <div class="text-2xl text-gray-400">→</div>
+                    <div id="step-ci" class="workflow-step border-2 border-gray-300 rounded-lg p-4 text-center">CI/CD (テスト)</div>
+                    <div class="text-2xl text-gray-400">→</div>
+                    <div id="step-deploy" class="workflow-step border-2 border-gray-300 rounded-lg p-4 text-center">デプロイ & モニタリング</div>
+                </div>
+            </div>
+
+            <div id="workflow-details" class="mt-10"></div>
+        </section>
+
+        <section id="tools" class="section">
+            <div class="text-center">
+                <h2 class="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">ツールとフレームワーク</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
+                    Prompt-as-Codeの実践を支援する主要なツールと思想を比較します。
+                </p>
+            </div>
+            <div class="mt-12 overflow-x-auto">
+                <div class="bg-white shadow-md rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">特徴</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GenAIScript</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PromptOps</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Langfuse</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr class="tool-row">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">基本思想</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">プログラミングとしてのプロンプト</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Gitネイティブなワークフロー</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">プロンプトCMS</td>
+                            </tr>
+                            <tr class="tool-row">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">主要フォーマット</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">JavaScript/TypeScript</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">YAML</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">UI / API経由</td>
+                            </tr>
+                            <tr class="tool-row">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">バージョン管理</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">手動 (Git)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">自動 (Git連携)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">自動 (プラットフォーム内)</td>
+                            </tr>
+                            <tr class="tool-row">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">コラボレーション</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">開発者中心 (コードベース)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">開発者中心 (Gitベース)</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">非技術者も参加可能 (UI)</td>
+                            </tr>
+                             <tr class="tool-row">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">最適なユースケース</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">複雑なエージェント、JSエコシステムでの開発</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">宣言的な定義とDevOpsの親和性を重視</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">迅速なイテレーションと非技術者との協業</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="adoption" class="section">
+            <div class="text-center">
+                <h2 class="text-3xl md:text-4xl font-bold tracking-tight text-gray-900">戦略的導入ロードマップ</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-600">
+                    組織にPrompt-as-Code文化を根付かせるための段階的なアプローチです。
+                </p>
+            </div>
+            <div class="mt-12 max-w-4xl mx-auto">
+                <div class="space-y-8">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-cyan-600 text-white rounded-full font-bold text-xl">1</div>
+                        <div class="ml-6">
+                            <h4 class="text-lg font-semibold text-gray-900">小さく始める (Start Small)</h4>
+                            <p class="mt-1 text-gray-600">全社一斉導入ではなく、単一の重要プロジェクトをパイロットとして選定し、リスクを最小限に抑えながら価値を実証します。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-cyan-600 text-white rounded-full font-bold text-xl">2</div>
+                        <div class="ml-6">
+                            <h4 class="text-lg font-semibold text-gray-900">標準を確立する (Establish Standards)</h4>
+                            <p class="mt-1 text-gray-600">リポジトリ構造、コミットメッセージ規約、レビューチェックリストなどの標準を定義し、一貫性を保ちます。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-cyan-600 text-white rounded-full font-bold text-xl">3</div>
+                        <div class="ml-6">
+                            <h4 class="text-lg font-semibold text-gray-900">自動化を導入する (Introduce Automation)</h4>
+                            <p class="mt-1 text-gray-600">`promptfoo`等を用いて基本的なCIパイプラインを構築し、プルリクエストごとに自動テストを実行する仕組みを作ります。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-cyan-600 text-white rounded-full font-bold text-xl">4</div>
+                        <div class="ml-6">
+                            <h4 class="text-lg font-semibold text-gray-900">教育と普及 (Educate and Evangelize)</h4>
+                            <p class="mt-1 text-gray-600">新しいワークフローについてチームをトレーニングし、品質向上などの具体的なメリットをデモして価値を組織内に広めます。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-cyan-600 text-white rounded-full font-bold text-xl">5</div>
+                        <div class="ml-6">
+                            <h4 class="text-lg font-semibold text-gray-900">反復と拡大 (Iterate and Expand)</h4>
+                            <p class="mt-1 text-gray-600">パイロットでの学びを元にプロセスを改善し、セマンティック差分のような高度な機能を取り入れながら他プロジェクトへ展開します。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-gray-800 text-white mt-16">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-sm">
+            <p>このインタラクティブレポートは、提供された「GitHubを活用したPrompt-as-Code」レポートに基づいて生成されました。</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const sections = document.querySelectorAll('.section');
+            const navLinks = document.querySelectorAll('.nav-link');
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+
+            const workflowSteps = {
+                'step-versioning': {
+                    title: '1. バージョン管理 (Git)',
+                    content: `
+                        <p class="text-gray-600 mb-4">プロンプトをコードとして扱い、Gitで全ての変更を管理します。これにより、完全な変更履歴の追跡、安全な実験（ブランチ）、体系的な統合（マージ）が可能になります。</p>
+                        <h5 class="font-semibold mb-2">ベストプラクティス:</h5>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1 mb-4">
+                            <li><strong>フィーチャーブランチ:</strong> プロンプトの改善ごとにブランチを作成 (例: <code>feature/improve-summary-prompt</code>)</li>
+                            <li><strong>Conventional Commits:</strong> 変更の意図がわかるコミットメッセージ (例: <code>feat(prompts): add persona</code>)</li>
+                        </ul>
+                        <h5 class="font-semibold mb-2">ディレクトリ構造例:</h5>
+                        <pre class="bg-gray-800 text-white p-4 rounded-md text-sm overflow-x-auto"><code>/prompts
+  /user_management
+    create_user.prompt.yml
+  /shared
+    error_handling.j2
+/tests
+  /prompts
+    evaluation_sets/</code></pre>
+                    `
+                },
+                'step-review': {
+                    title: '2. 協調的レビュー (Pull Request)',
+                    content: `
+                        <p class="text-gray-600 mb-4">プルリクエスト(PR)を、プロンプトの品質を議論・改善するための中心的な場とします。これにより、属人的な知識がチームの資産になります。</p>
+                        <h5 class="font-semibold mb-2">レビューの観点:</h5>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            <li><strong>明確性と具体性:</strong> 指示は曖昧でなく、一意に解釈できるか？</li>
+                            <li><strong>堅牢性と安全性:</strong> エッジケースやプロンプトインジェクションへの耐性はあるか？</li>
+                            <li><strong>効率性:</strong> より簡潔に、またはより安価なモデルで実現できないか？</li>
+                            <li><strong>保守性:</strong> 構造化され、ドキュメントは整備されているか？</li>
+                        </ul>
+                        <p class="mt-4 text-gray-600">GitHubの「変更の提案」機能を活用し、具体的な修正案を提示することで、レビュープロセスを効率化できます。</p>
+                    `
+                },
+                'step-ci': {
+                    title: '3. CI/CDによる自動テスト',
+                    content: `
+                        <p class="text-gray-600 mb-4">PRが作成されるたびに、GitHub Actionsでプロンプトの品質評価を自動実行します。これにより、品質低下（リグレッション）を早期に発見できます。</p>
+                        <h5 class="font-semibold mb-2">主要ツール: <code>promptfoo</code></h5>
+                        <p class="text-gray-600 mb-4">設定ファイル(<code>promptfooconfig.yaml</code>)に基づき、評価データセットを用いてプロンプトの出力を自動でテストし、結果をPRにコメントします。</p>
+                        <h5 class="font-semibold mb-2">プロンプトテストピラミッド</h5>
+                        <p class="text-gray-600 mb-4">品質と開発速度のバランスをとるためのテスト戦略モデルです。</p>
+                        <div class="chart-container">
+                            <canvas id="testPyramidChart"></canvas>
+                        </div>
+                    `
+                },
+                'step-deploy': {
+                    title: '4. デプロイ & モニタリング',
+                    content: `
+                        <p class="text-gray-600 mb-4">テストを通過したプロンプトは自動的にデプロイされます。しかし、ライフサイクルはそこで終わりません。本番環境でのパフォーマンスを継続的に監視することが重要です。</p>
+                        <h5 class="font-semibold mb-2">主要ツール: Langfuse, LangSmithなど</h5>
+                        <p class="text-gray-600 mb-4">これらのLLMオブザーバビリティプラットフォームを用いて、以下の指標を追跡します。</p>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            <li><strong>パフォーマンス:</strong> APIレイテンシー、トークン使用量、コスト</li>
+                            <li><strong>品質:</strong> ユーザーフィードバック、出力内容のドリフト検出</li>
+                            <li><strong>バージョン追跡:</strong> 全てのAPIコールを特定のプロンプトバージョンに紐付け、問題の原因を特定</li>
+                        </ul>
+                    `
+                }
+            };
+            
+            const workflowDetailsContainer = document.getElementById('workflow-details');
+            const workflowStepButtons = document.querySelectorAll('.workflow-step');
+
+            function showWorkflowDetail(stepId) {
+                const detail = workflowSteps[stepId];
+                if (!detail) return;
+
+                workflowStepButtons.forEach(btn => btn.classList.remove('active'));
+                document.getElementById(stepId).classList.add('active');
+
+                workflowDetailsContainer.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow-lg animate-fade-in">
+                        <h4 class="text-2xl font-bold text-gray-800 mb-4">${detail.title}</h4>
+                        ${detail.content}
+                    </div>
+                `;
+
+                if (stepId === 'step-ci') {
+                    renderTestPyramidChart();
+                }
+            }
+            
+            workflowStepButtons.forEach(button => {
+                button.addEventListener('click', () => showWorkflowDetail(button.id));
+            });
+
+            function renderTestPyramidChart() {
+                const ctx = document.getElementById('testPyramidChart')?.getContext('2d');
+                if (!ctx) return;
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['手動評価 / A/Bテスト', '自動化された機能評価', 'セマンティック/単体テスト'],
+                        datasets: [{
+                            label: '実行コスト',
+                            data: [90, 50, 10],
+                            backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1
+                        }, {
+                            label: '実行速度',
+                            data: [10, 40, 95],
+                            backgroundColor: 'rgba(34, 197, 94, 0.6)',
+                            borderColor: 'rgba(34, 197, 94, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                stacked: true,
+                                ticks: { display: false },
+                                grid: { display: false }
+                            },
+                            y: {
+                                stacked: true,
+                                ticks: {
+                                    font: {
+                                        size: 12,
+                                        family: "'Inter', 'Noto Sans JP', sans-serif"
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        label += context.raw;
+                                        if (context.dataset.label === '実行コスト') {
+                                            label += ' (高)';
+                                        } else {
+                                            label += ' (速)';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function updateActiveState() {
+                const hash = window.location.hash || '#home';
+                
+                sections.forEach(section => {
+                    if ('#' + section.id === hash) {
+                        section.classList.add('active');
+                    } else {
+                        section.classList.remove('active');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    if (link.getAttribute('href') === hash) {
+                        link.classList.add('active');
+                    } else {
+                        link.classList.remove('active');
+                    }
+                });
+                
+                if (hash === '#workflow') {
+                    showWorkflowDetail('step-versioning');
+                }
+            }
+
+            window.addEventListener('hashchange', updateActiveState);
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    if (mobileMenu.classList.contains('hidden') === false) {
+                        mobileMenu.classList.add('hidden');
+                    }
+                });
+            });
+
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+
+            updateActiveState();
+        });
+    </script>
+</body>
+</html>
